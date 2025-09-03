@@ -58,11 +58,15 @@ MIDDLEWARE = [
 # https://docs.djangoproject.com/en/3.0/ref/settings/#databases
 
 
-NEOMODEL_NEO4J_BOLT_URL = os.environ.get('bolt://neo4j:neo4j@localhost:7687','bolt://neo4j:password1@localhost:7687')
+import os
+
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-secret")
+DEBUG = os.getenv("DJANGO_DEBUG", "1") == "1"
+ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "*").split(",")
+
+NEOMODEL_NEO4J_BOLT_URL = os.getenv("NEOMODEL_NEO4J_BOLT_URL", "bolt://neo4j:password1@localhost:7687")
 NEOMODEL_SIGNALS = False
 NEOMODEL_FORCE_TIMEZONE = True
-NEOMODEL_ENCRYPTED_CONNECTION = True
-NEOMODEL_MAX_POOL_SIZE = 50
 
 ROOT_URLCONF = 'cerberus_ms_rest.urls'
 

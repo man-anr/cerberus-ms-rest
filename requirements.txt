@@ -1,0 +1,7 @@
+django
+djangorestframework
+drf-spectacular
+drf-spectacular-sidecar
+neomodel
+gunicorn
+django_neomodel

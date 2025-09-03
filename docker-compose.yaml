@@ -1,0 +1,19 @@
+version: "3.9"
+
+services:
+  web:
+    build: .
+    container_name: cerberus_api
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    command: sh -c "python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - .:/app
+
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/health/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
