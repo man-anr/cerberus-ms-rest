@@ -1467,23 +1467,33 @@ class ThreatAssessmentView(APIView):
         
         for component in components:
             if component.get("type") == "data_store":
-                threats.append({
-                    "threat_id": f"tampering_{component['id']}",
-                    "threat_name": f"Data Tampering - {component['name']}",
-                    "threat_type": "tampering",
-                    "description": f"Unauthorized modification of data in {component['name']}",
-                    "linked_component_ids": [component['id']],
-                    "criticality": "high" if component.get("criticality") in ["high", "critical"] else "medium",
-                    "impact": "Data integrity compromise, potential business impact",
-                    "likelihood": "medium",
-                    "mitigation_strategies": [
-                        "Implement data integrity checks",
-                        "Use database encryption",
-                        "Implement access controls and audit logging",
-                        "Regular data backup and recovery procedures"
-                    ],
-                    "confidence_score": 0.7
-                })
+                # Only generate tampering threats for data stores that contain sensitive or critical data
+                should_analyze = (
+                    component.get("criticality") in ["medium", "high", "critical"] or
+                    "user" in component.get("name", "").lower() or
+                    "customer" in component.get("name", "").lower() or
+                    "payment" in component.get("name", "").lower() or
+                    "personal" in component.get("name", "").lower()
+                )
+                
+                if should_analyze:
+                    threats.append({
+                        "threat_id": f"tampering_{component['id']}",
+                        "threat_name": f"Data Tampering - {component['name']}",
+                        "threat_type": "tampering",
+                        "description": f"Unauthorized modification of data in {component['name']}",
+                        "linked_component_ids": [component['id']],
+                        "criticality": "high" if component.get("criticality") in ["high", "critical"] else "medium",
+                        "impact": "Data integrity compromise, potential business impact",
+                        "likelihood": "medium",
+                        "mitigation_strategies": [
+                            "Implement data integrity checks",
+                            "Use database encryption",
+                            "Implement access controls and audit logging",
+                            "Regular data backup and recovery procedures"
+                        ],
+                        "confidence_score": 0.7
+                    })
         
         return threats
     
@@ -1544,25 +1554,42 @@ class ThreatAssessmentView(APIView):
         """Analyze for denial of service threats."""
         threats = []
         
+        # Only generate DoS threats for critical components or those with high connectivity
         for component in components:
             if component.get("type") in ["process", "data_store"]:
-                threats.append({
-                    "threat_id": f"dos_{component['id']}",
-                    "threat_name": f"Denial of Service - {component['name']}",
-                    "threat_type": "denial_of_service",
-                    "description": f"{component['name']} may become unavailable due to resource exhaustion or attacks",
-                    "linked_component_ids": [component['id']],
-                    "criticality": "high" if component.get("criticality") in ["high", "critical"] else "medium",
-                    "impact": "Service unavailability, business disruption",
-                    "likelihood": "medium",
-                    "mitigation_strategies": [
-                        "Implement rate limiting and throttling",
-                        "Use load balancing and redundancy",
-                        "Implement resource monitoring and alerting",
-                        "DDoS protection and traffic filtering"
-                    ],
-                    "confidence_score": 0.7
-                })
+                # Check if component is critical or has many connections
+                component_id = component['id']
+                connection_count = len([c for c in connections 
+                                      if c.get('from') == component_id or c.get('to') == component_id])
+                
+                # Only generate DoS threat if:
+                # 1. Component is marked as critical/high criticality, OR
+                # 2. Component has 3+ connections (high connectivity), OR
+                # 3. Component is a data store with sensitive data
+                should_analyze = (
+                    component.get("criticality") in ["high", "critical"] or
+                    connection_count >= 3 or
+                    (component.get("type") == "data_store" and component.get("criticality") in ["medium", "high", "critical"])
+                )
+                
+                if should_analyze:
+                    threats.append({
+                        "threat_id": f"dos_{component['id']}",
+                        "threat_name": f"Denial of Service - {component['name']}",
+                        "threat_type": "denial_of_service",
+                        "description": f"{component['name']} may become unavailable due to resource exhaustion or attacks",
+                        "linked_component_ids": [component['id']],
+                        "criticality": "high" if component.get("criticality") in ["high", "critical"] else "medium",
+                        "impact": "Service unavailability, business disruption",
+                        "likelihood": "medium",
+                        "mitigation_strategies": [
+                            "Implement rate limiting and throttling",
+                            "Use load balancing and redundancy",
+                            "Implement resource monitoring and alerting",
+                            "DDoS protection and traffic filtering"
+                        ],
+                        "confidence_score": 0.7
+                    })
         
         return threats
     
@@ -1570,25 +1597,54 @@ class ThreatAssessmentView(APIView):
         """Analyze for elevation of privilege threats."""
         threats = []
         
+        # Only generate privilege escalation threats for processes that handle authentication, 
+        # authorization, or have administrative functions
         for component in components:
             if component.get("type") == "process":
-                threats.append({
-                    "threat_id": f"elevation_{component['id']}",
-                    "threat_name": f"Privilege Escalation - {component['name']}",
-                    "threat_type": "elevation_of_privilege",
-                    "description": f"Unauthorized users may gain elevated privileges in {component['name']}",
-                    "linked_component_ids": [component['id']],
-                    "criticality": "high" if component.get("criticality") in ["high", "critical"] else "medium",
-                    "impact": "Unauthorized access to sensitive resources and administrative functions",
-                    "likelihood": "low",
-                    "mitigation_strategies": [
-                        "Implement principle of least privilege",
-                        "Regular privilege audits and reviews",
-                        "Use role-based access control (RBAC)",
-                        "Implement privilege escalation monitoring and alerting"
-                    ],
-                    "confidence_score": 0.6
-                })
+                component_name = component.get("name", "").lower()
+                component_description = component.get("description", "").lower()
+                
+                # Check if this process is likely to handle privileges, auth, or admin functions
+                privilege_indicators = [
+                    "auth", "login", "admin", "user", "role", "permission", 
+                    "access", "control", "manage", "configure", "system"
+                ]
+                
+                has_privilege_context = any(indicator in component_name or indicator in component_description 
+                                          for indicator in privilege_indicators)
+                
+                # Only generate privilege escalation threat if:
+                # 1. Component is marked as critical/high criticality, OR
+                # 2. Component name/description suggests privilege handling, OR
+                # 3. Component has many connections (central component)
+                component_id = component['id']
+                connection_count = len([c for c in connections 
+                                      if c.get('from') == component_id or c.get('to') == component_id])
+                
+                should_analyze = (
+                    component.get("criticality") in ["high", "critical"] or
+                    has_privilege_context or
+                    connection_count >= 4  # Central components are more likely to have privilege issues
+                )
+                
+                if should_analyze:
+                    threats.append({
+                        "threat_id": f"elevation_{component['id']}",
+                        "threat_name": f"Privilege Escalation - {component['name']}",
+                        "threat_type": "elevation_of_privilege",
+                        "description": f"Unauthorized users may gain elevated privileges in {component['name']}",
+                        "linked_component_ids": [component['id']],
+                        "criticality": "high" if component.get("criticality") in ["high", "critical"] else "medium",
+                        "impact": "Unauthorized access to sensitive resources and administrative functions",
+                        "likelihood": "low",
+                        "mitigation_strategies": [
+                            "Implement principle of least privilege",
+                            "Regular privilege audits and reviews",
+                            "Use role-based access control (RBAC)",
+                            "Implement privilege escalation monitoring and alerting"
+                        ],
+                        "confidence_score": 0.6
+                    })
         
         return threats
         
