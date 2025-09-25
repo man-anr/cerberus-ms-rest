@@ -150,12 +150,17 @@ class UserListCreateView(APIView):
     POST /api/users/
     """
     def get(self, request):
-        users = UserNode.nodes.all()
-        data = [
-            {"key": u.key, "email": u.email, "name": u.name, "role": u.role, "meta": u.meta}
-            for u in users
-        ]
-        return Response(data)
+        try:
+            # Limit the query to prevent timeouts
+            users = UserNode.nodes.all()[:100]  # Limit to 100 users max
+            data = [
+                {"key": u.key, "email": u.email, "name": u.name, "role": u.role, "meta": u.meta}
+                for u in users
+            ]
+            return Response(data)
+        except Exception as e:
+            print(f"ERROR: Failed to fetch users: {e}")
+            return Response({"error": "Database connection failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
     def post(self, request):
         s = UserSerializer(data=request.data)
@@ -235,9 +240,16 @@ class UserDetailView(APIView):
 )
 class ProjectListCreateView(APIView):
     def get(self, request):
-        projects = Project.nodes.all()
-        data = [serialize_project(p) for p in projects]
-        return Response(data)
+        try:
+            # Fetch real projects from Neo4j
+            print("DEBUG: Fetching real projects from Neo4j")
+            projects = Project.nodes.all()
+            serialized_projects = [serialize_project(p) for p in projects]
+            print(f"DEBUG: Found {len(serialized_projects)} projects")
+            return Response(serialized_projects)
+        except Exception as e:
+            print(f"ERROR: Failed to fetch projects: {e}")
+            return Response({"error": "Database connection failed"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
     def post(self, request):
         s = ProjectSerializer(data=request.data)

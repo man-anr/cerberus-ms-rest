@@ -38,7 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'django_neomodel',
+    # 'django_neomodel',  # Temporarily disabled to prevent Neo4j connection issues
     'dfd',
     'drf_spectacular',
     'drf_spectacular_sidecar',
@@ -95,13 +95,24 @@ ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "*").split(",")
 
 # Configure neomodel directly
 import neomodel
-neomodel.config.DATABASE_URL = "bolt://neo4j:92BTCuL5rSpNSwv4EHg0FAY7G@35.164.76.247:7687"
+# Use direct IP for now (will implement auto-update mechanism)
+neo4j_url = os.getenv("NEOMODEL_NEO4J_BOLT_URL", "bolt://neo4j:92BTCuL5rSpNSwv4EHg0FAY7G@10.0.11.125:7687")
+neomodel.config.DATABASE_URL = neo4j_url
+neomodel.config.MAX_CONNECTION_POOL_SIZE = 5
+neomodel.config.CONNECTION_TIMEOUT = 10
+neomodel.config.MAX_CONNECTION_LIFETIME = 1800
+neomodel.config.ENCRYPTED_CONNECTION = False
 print(f"DEBUG: neomodel.config.DATABASE_URL = {neomodel.config.DATABASE_URL}")
 
+# Skip Neo4j connection test on startup to prevent hanging
+print("DEBUG: Skipping Neo4j connection test on startup - will test on first use")
+
 # Legacy Django neomodel settings (for compatibility)
-NEOMODEL_NEO4J_BOLT_URL = "bolt://neo4j:92BTCuL5rSpNSwv4EHg0FAY7G@35.164.76.247:7687"
+NEOMODEL_NEO4J_BOLT_URL = "bolt://neo4j:92BTCuL5rSpNSwv4EHg0FAY7G@10.0.11.125:7687"
 NEOMODEL_SIGNALS = False
 NEOMODEL_FORCE_TIMEZONE = True
+NEOMODEL_MAX_CONNECTION_POOL_SIZE = 10
+NEOMODEL_CONNECTION_TIMEOUT = 10
 
 ROOT_URLCONF = 'cerberus_ms_rest.urls'
 

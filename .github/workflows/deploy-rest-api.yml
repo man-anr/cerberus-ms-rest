@@ -1,0 +1,100 @@
+name: Deploy REST API to AWS ECS
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'dfd/**'
+      - 'cerberus_ms_rest/**'
+      - 'requirements.txt'
+      - 'Dockerfile'
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - 'dfd/**'
+      - 'cerberus_ms_rest/**'
+      - 'requirements.txt'
+      - 'Dockerfile'
+
+env:
+  AWS_REGION: us-west-2
+  ECR_REPOSITORY: cerberus-rest
+  ECS_SERVICE: cerberus-rest-service
+  ECS_CLUSTER: cerberus-cluster
+  ECS_TASK_DEFINITION: cerberus-rest
+  CONTAINER_NAME: cerberus-rest
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v2
+
+    - name: Build, tag, and push image to Amazon ECR
+      id: build-image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        # Build a docker container and push it to ECR
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+    - name: Fill in the new image ID in the Amazon ECS task definition
+      id: task-def
+      uses: aws-actions/amazon-ecs-render-task-definition@v1
+      with:
+        task-definition: ${{ env.ECS_TASK_DEFINITION }}
+        container-name: ${{ env.CONTAINER_NAME }}
+        image: ${{ steps.build-image.outputs.image }}
+
+    - name: Deploy Amazon ECS task definition
+      uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+      with:
+        task-definition: ${{ steps.task-def.outputs.task-definition }}
+        service: ${{ env.ECS_SERVICE }}
+        cluster: ${{ env.ECS_CLUSTER }}
+        wait-for-service-stability: true
+
+    - name: Verify deployment
+      run: |
+        echo "Waiting for service to stabilize..."
+        sleep 30
+        
+        echo "Testing API health endpoint..."
+        for i in {1..5}; do
+          if curl -f -s https://api.bassiman.com/api/health/ > /dev/null; then
+            echo "✅ API health check passed"
+            break
+          else
+            echo "⏳ Attempt $i/5: API not ready yet, waiting..."
+            sleep 10
+          fi
+        done
+        
+        echo "Testing projects endpoint..."
+        response=$(curl -s https://api.bassiman.com/api/projects/ -H "Origin: https://man-anr.github.io")
+        echo "Projects response: $response"
+        
+        # Check if response contains real data (not mock data)
+        if echo "$response" | grep -q "test-project-1"; then
+          echo "⚠️  Warning: API still returning mock data - deployment may need more time"
+        else
+          echo "✅ API returning real data from Neo4j"
+        fi

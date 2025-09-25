@@ -2,7 +2,7 @@ from django.urls import path
 from django.urls import re_path
 
 
-from dfd.health import HealthView
+from dfd.health import HealthView, TestView, TestProjectsView
 from .views import (
     # Users
     DiagramBulkSyncView, UserListCreateView, UserDetailView,
@@ -22,6 +22,8 @@ from .views import (
 
 urlpatterns = [
     path('health/', HealthView.as_view(), name='health'),
+    path('test/', TestView.as_view(), name='test'),
+    path('test-projects/', TestProjectsView.as_view(), name='test-projects'),
 
     # Users
     path('users/', UserListCreateView.as_view(), name='user-list-create'),
