@@ -56,6 +56,32 @@ MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
 ]
 CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [
+    "http://localhost:3000",
+    "http://localhost:8080", 
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:8080",
+    "https://man-anr.github.io",
+    "https://man-anr.github.io/cerberus",
+    "https://man-anr.github.io/cerberus/",
+]
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https://.*\.github\.io$",
+    r"^http://localhost:\d+$",
+    r"^http://127\.0\.0\.1:\d+$",
+]
+CORS_ALLOW_HEADERS = [
+    'accept',
+    'accept-encoding',
+    'authorization',
+    'content-type',
+    'dnt',
+    'origin',
+    'user-agent',
+    'x-csrftoken',
+    'x-requested-with',
+]
 
 # Database
 # https://docs.djangoproject.com/en/3.0/ref/settings/#databases
@@ -67,7 +93,13 @@ SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "dev-secret")
 DEBUG = os.getenv("DJANGO_DEBUG", "1") == "1"
 ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "*").split(",")
 
-NEOMODEL_NEO4J_BOLT_URL = os.getenv("NEOMODEL_NEO4J_BOLT_URL", "bolt://neo4j:password1@localhost:7687")
+# Configure neomodel directly
+import neomodel
+neomodel.config.DATABASE_URL = "bolt://neo4j:92BTCuL5rSpNSwv4EHg0FAY7G@35.164.76.247:7687"
+print(f"DEBUG: neomodel.config.DATABASE_URL = {neomodel.config.DATABASE_URL}")
+
+# Legacy Django neomodel settings (for compatibility)
+NEOMODEL_NEO4J_BOLT_URL = "bolt://neo4j:92BTCuL5rSpNSwv4EHg0FAY7G@35.164.76.247:7687"
 NEOMODEL_SIGNALS = False
 NEOMODEL_FORCE_TIMEZONE = True
 
